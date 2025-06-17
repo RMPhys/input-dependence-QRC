@@ -8,6 +8,7 @@ we will employ in the main.
 module SQmodule
 include("packgs.jl")
 using SparseArrays
+using Statistics
 using LinearAlgebra
 const σz = sparse(Matrix{ComplexF64}([1 0; 0 -1])) 
 const σx = sparse(Matrix{ComplexF64}([0 1; 1 0]))
@@ -87,10 +88,10 @@ function train(model::SQModel,u::Matrix{Float64},y::Matrix{Float64},N::Int64,was
     ρ0 = washout_phase(model,u[1:washout,:],washout)
     # Training phase
     RES,ρ = RES_construct(model,u[washout+1:N,:],ρ0,N-washout)
-    RESplusone = hcat(RES,ones(Float64,size(RES, 1)))
-    weights = regression(RESplusone,y[washout+1:N,:],model.λ) 
+    weights = regression(RES,y[washout+1:N,:],model.λ) 
     return weights,ρ
 end
+
 
 
 function pred_closedloop(model::SQModel,u1::Vector{Float64},weights::Matrix{Float64},ρ0::Matrix{ComplexF64},Ntest::Int64)   
@@ -122,10 +123,13 @@ end
 
 
 function regression(A::Matrix{Float64},y::Matrix{Float64},λ::Float64) 
-    weights = (transpose(A)*A + λ*I)\(transpose(A)*y)
-    return weights
+    ymean = mean(y,dims=1) 
+    ycenter = y .- ymean #centered y
+    Amean = mean(A,dims=1)
+    Acenter = A .- Amean #centered A
+    weights = (transpose(Acenter)*Acenter + λ*I)\(transpose(Acenter)*ycenter)
+    intercept = ymean - Amean*weights
+    return vcat(weights,intercept)
 end
-
-
 
 end #end of module
